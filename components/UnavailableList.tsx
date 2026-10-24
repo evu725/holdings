@@ -1,4 +1,4 @@
-import type { UnavailableBrand } from "@/lib/types";
+import type { UnavailableBrand } from "@/lib/types.frontend";
 
 export default function UnavailableList({ brands }: { brands: UnavailableBrand[] }) {
   if (!brands.length) return null;
