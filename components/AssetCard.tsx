@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { MatchedAsset } from "@/lib/types";
+import type { MatchedAsset } from "@/lib/types.frontend";
 
 export default function AssetCard({ asset }: { asset: MatchedAsset }) {
   const [open, setOpen] = useState(false);
@@ -25,7 +25,7 @@ export default function AssetCard({ asset }: { asset: MatchedAsset }) {
             )}
           </div>
           <p className="truncate font-medium">{asset.company}</p>
-          <p className="text-sm text-faded">from &ldquo;{asset.brand}&rdquo;</p>
+          {asset.brand && <p className="text-sm text-faded">from &ldquo;{asset.brand}&rdquo;</p>}
         </div>
       </div>
 

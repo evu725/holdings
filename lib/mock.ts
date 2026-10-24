@@ -1,4 +1,4 @@
-import type { MatchedAsset, MatchResponse, UnavailableBrand } from "./types";
+import type { MatchedAsset, MatchResponse, UnavailableBrand } from "./types.frontend";
 
 // Stand-in for /api/match until the backend is ready. The data is made up for layout
 // work, not taken from the True Markets catalog. Replace mockMatch with a fetch later.

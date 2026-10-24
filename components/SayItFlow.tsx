@@ -1,87 +1,65 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import SaveDiscoveryButton from "./SaveDiscoveryButton";
+import GmailFloatingButton from "./GmailFloatingButton";
 import AssetCard from "./AssetCard";
 import LiveClock from "./LiveClock";
 import MicButton from "./MicButton";
 import TickerStrip from "./TickerStrip";
 import UnavailableList from "./UnavailableList";
-import { MOCK_SYMBOLS, mockMatch } from "@/lib/mock";
-import type { MatchResponse } from "@/lib/types";
+import useDiscovery from "@/hooks/useDiscovery";
+import { discoveryText } from "@/lib/discovery";
+import { toFrontendMatch } from "@/lib/frontend-adapter";
 
 type Phase = "idle" | "listening" | "review" | "loading" | "results";
-
-const EXAMPLES = [
-  "I play Roblox and watch Netflix",
-  "I shop at Lululemon and drink Coke",
-];
-
-// The mic is mocked: it "hears" this sentence word by word. Replace with real
-// recording (MediaRecorder) + /api/transcribe once the backend route exists.
-const FAKE_SPEECH =
-  "I play Roblox, watch Netflix, buy Lululemon, and my dad works at Coca-Cola.";
-
+const EXAMPLES = ["I play Roblox and watch Netflix", "I shop at Lululemon and use Instagram"];
 const MIC_HINTS: Record<Phase, string> = {
-  idle: "Tap and tell me what you use",
-  listening: "Listening… tap to stop",
-  review: "Got it. Fix anything I misheard.",
-  loading: "Checking the catalog…",
-  results: "",
+  idle: "Tap and tell me what you use", listening: "Listening… tap to stop",
+  review: "Review your brands before continuing.", loading: "Checking the catalog…", results: "",
 };
 
 export default function SayItFlow() {
-  const [phase, setPhase] = useState<Phase>("idle");
-  const [transcript, setTranscript] = useState("");
-  const [typed, setTyped] = useState("");
-  const [result, setResult] = useState<MatchResponse | null>(null);
-  const speechTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const { text: transcript, result: apiResult, emailBrands, busy, listening, speechSupported, notice, audioUrl, draftRestored, attachAudio, changeText, changeEmailBrands, startListening: beginListening, stopListening: endListening, findCompanies, createSpeech, saveDraft, reset } = useDiscovery();
+  const [reviewing, setReviewing] = useState(false);
+  const [symbols, setSymbols] = useState<string[]>([]);
+  const [catalogSource, setCatalogSource] = useState<"live" | "fallback" | "unavailable" | null>(null);
+  const typed = transcript;
+  const setTyped = changeText;
+  const result = apiResult ? toFrontendMatch(apiResult) : null;
+  const phase: Phase = listening ? "listening" : result ? "results" : busy ? "loading" : reviewing || emailBrands.length || draftRestored ? "review" : "idle";
 
-  function clearSpeechTimer() {
-    if (speechTimer.current) clearInterval(speechTimer.current);
-    speechTimer.current = null;
+  useEffect(() => {
+    const controller = new AbortController();
+    function refresh() { return fetch("/api/catalog", { signal: controller.signal, cache: "no-store" }).then(response => {
+      if (!response.ok) throw new Error("Catalog unavailable");
+      return response.json();
+    }).then(data => {
+      setSymbols(data.assets.map((asset: { symbol: string }) => asset.symbol));
+      setCatalogSource(data.source === "live" ? "live" : "fallback");
+    }).catch(() => { if (!controller.signal.aborted) setCatalogSource("unavailable"); }); }
+    void refresh();
+    const timer = setInterval(() => { void refresh(); }, 60_000);
+    return () => { controller.abort(); clearInterval(timer); };
+  }, []);
+
+  function startListening() { setReviewing(true); beginListening(); }
+  function stopListening() { endListening(); }
+  function findStocks(text: string) {
+    if (busy || listening) return;
+    setReviewing(true);
+    changeText(text);
+    void findCompanies(text);
   }
-
-  useEffect(() => clearSpeechTimer, []);
-
-  function stopListening() {
-    clearSpeechTimer();
-    setPhase("review");
-  }
-
-  function startListening() {
-    const words = FAKE_SPEECH.split(" ");
-    let count = 0;
-    setTranscript("");
-    setPhase("listening");
-    speechTimer.current = setInterval(() => {
-      count += 1;
-      setTranscript(words.slice(0, count).join(" "));
-      if (count >= words.length) stopListening();
-    }, 220);
-  }
-
-  async function findStocks(text: string) {
-    if (!text.trim()) return;
-    setTranscript(text);
-    setPhase("loading");
-    setResult(await mockMatch(text));
-    setPhase("results");
-  }
-
-  function startOver() {
-    clearSpeechTimer();
-    setTranscript("");
-    setTyped("");
-    setResult(null);
-    setPhase("idle");
-  }
-
+  function startOver() { if (busy || listening) return; reset(); setReviewing(false); }
   return (
     <div className="page-wash flex min-h-dvh flex-col">
       <header className="flex w-full items-center justify-between gap-4 px-[clamp(1rem,4vw,3rem)] py-[clamp(0.75rem,2.5vh,1.5rem)]">
         <button
           type="button"
           onClick={startOver}
+          disabled={busy || listening}
           aria-label="hodlings, start over"
           className="font-serif text-[clamp(1.75rem,3vw,2.25rem)] hover:text-faded"
         >
@@ -111,7 +89,7 @@ export default function SayItFlow() {
             {/* The extra 14px above and below leaves room for the mic's outer ring. */}
             <MicButton
               listening={phase === "listening"}
-              disabled={phase === "loading"}
+              disabled={busy || speechSupported === false}
               onClick={phase === "listening" ? stopListening : startListening}
             />
             <p className="font-mono text-[clamp(0.8125rem,1.3vw,1rem)] text-faded" aria-live="polite">
@@ -119,6 +97,11 @@ export default function SayItFlow() {
             </p>
           </div>
         )}
+
+        {phase !== "results" && <p className="mt-3 max-w-xl font-mono text-xs text-faded">
+          {speechSupported === false ? "Voice input is unavailable here. Type below or try Chrome or Edge." : "Your browser may send audio to its speech recognition provider. Listening starts only when you press the mic."}
+        </p>}
+        <p role="status" aria-live="polite" className="mt-4 max-w-xl font-mono text-sm">{notice}</p>
 
         {phase === "idle" && (
           <>
@@ -135,6 +118,7 @@ export default function SayItFlow() {
               <input
                 id="typed"
                 value={typed}
+                maxLength={2000}
                 onChange={(e) => setTyped(e.target.value)}
                 placeholder="or type it: “I watch Netflix…”"
                 className="min-w-0 flex-1 bg-transparent py-2 font-mono text-[clamp(0.8125rem,1.3vw,1rem)] placeholder:text-faded focus:outline-none"
@@ -143,7 +127,7 @@ export default function SayItFlow() {
                 type="submit"
                 aria-label="Find my stocks"
                 className="px-2 font-mono text-lg hover:text-faded disabled:opacity-30"
-                disabled={!typed.trim()}
+                disabled={!discoveryText(typed, emailBrands)}
               >
                 →
               </button>
@@ -177,7 +161,10 @@ export default function SayItFlow() {
         )}
 
         {phase === "review" && (
-          <div className="mt-10 w-full max-w-xl text-left">
+          <form className="mt-10 w-full max-w-xl text-left" onSubmit={event => {
+            event.preventDefault();
+            findStocks(transcript);
+          }}>
             <label
               htmlFor="transcript"
               className="font-mono text-xs uppercase tracking-[0.2em] text-faded"
@@ -187,15 +174,22 @@ export default function SayItFlow() {
             <textarea
               id="transcript"
               value={transcript}
-              onChange={(e) => setTranscript(e.target.value)}
+              maxLength={2000}
+              onChange={(e) => changeText(e.target.value)}
+              onKeyDown={event => {
+                if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                  event.preventDefault();
+                  if (discoveryText(transcript, emailBrands)) event.currentTarget.form?.requestSubmit();
+                }
+              }}
               rows={3}
               className="mt-2 w-full resize-none rounded-sm border border-rule bg-card p-4 font-mono text-base focus:border-ink focus:outline-none"
             />
+            <p className="mt-2 font-mono text-xs text-faded">Enter to discover · Shift+Enter for a new line</p>
             <div className="mt-4 flex flex-wrap gap-3">
               <button
-                type="button"
-                onClick={() => findStocks(transcript)}
-                disabled={!transcript.trim()}
+                type="submit"
+                disabled={!discoveryText(transcript, emailBrands)}
                 className="rounded-sm bg-ink px-5 py-3 font-mono text-sm text-paper hover:bg-ink/85 disabled:opacity-40"
               >
                 Find my stocks →
@@ -208,12 +202,12 @@ export default function SayItFlow() {
                 Say it again
               </button>
             </div>
-          </div>
+          </form>
         )}
 
         {phase === "loading" && (
           <div className="mt-10 w-full max-w-sm space-y-3 text-left font-mono text-xs uppercase tracking-[0.2em] text-faded">
-            {["Hearing brands", "Finding parent companies", "Checking True Markets"].map(
+            {["Reading your reviewed brands", "Finding parent companies", "Checking the available catalog"].map(
               (step, i) => (
                 <p
                   key={step}
@@ -239,10 +233,15 @@ export default function SayItFlow() {
               {result.spokenSummary}
             </p>
 
+            <p className="mt-3 font-mono text-xs text-faded">{apiResult?.source === "grok" ? "Explanations generated with Grok." : "Matched using the curated brand catalog."}</p>
+            {!!result.available.length && <SaveDiscoveryButton key={result.available.map(asset => asset.symbol).join(",")} companies={result.available} />}
+            <button type="button" disabled={busy} onClick={createSpeech} className="mt-4 rounded-sm border border-ink/30 px-5 py-3 font-mono text-sm disabled:opacity-40">{busy ? "Creating audio…" : "Create spoken summary"}</button>
+            {audioUrl && <audio ref={attachAudio} controls src={audioUrl} className="mt-4 w-full" aria-label="Spoken discovery summary" />}
+
             {result.available.length > 0 && (
               <section className="mt-8">
                 <h2 className="font-mono text-xs uppercase tracking-[0.2em] text-faded">
-                  You can own · {result.available.length}
+                  Companies to explore · {result.available.length}
                 </h2>
                 <div className="mt-3 grid gap-4 sm:grid-cols-2">
                   {result.available.map((asset) => (
@@ -265,7 +264,14 @@ export default function SayItFlow() {
         )}
       </main>
 
-      <TickerStrip symbols={MOCK_SYMBOLS} />
+      <footer className="mx-auto mb-6 w-full max-w-3xl space-y-3 px-[clamp(1rem,4vw,3rem)] text-center font-mono text-xs text-faded">
+        <Link href="/saved" className="inline-block underline underline-offset-4">Saved discoveries</Link>
+        {!!emailBrands.length && <p>{emailBrands.length} reviewed Gmail {emailBrands.length === 1 ? "brand" : "brands"} included. <button type="button" disabled={busy || listening} onClick={() => { changeEmailBrands([]); setReviewing(true); }} className="underline disabled:opacity-40">Clear</button></p>}
+        {catalogSource && <p>{catalogSource === "live" ? "● Live True Markets catalog · refreshes every 60s" : catalogSource === "fallback" ? "Saved catalog · live connection unavailable" : "Catalog connection unavailable"}</p>}
+        <p>Reviewed input may be sent to Grok. Educational discovery, not investment advice.</p>
+      </footer>
+      <TickerStrip symbols={symbols} />
+      <GmailFloatingButton disabled={busy || listening} onNavigate={saveDraft} />
     </div>
   );
 }
