@@ -1,26 +1,62 @@
 @import "tailwindcss";
 
+/* Minimal palette: paper and ink. Coral is only for the mic; green is only for the "Tradeable" badge. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --paper: #f4efe6;
+  --card: #fbf8f2;
+  --ink: #1a1714;
+  --mic: #ff6f61;
+  --accent: #1f7a55;
+  --faded: #6f675f;
+  --rule: #d9d0c3;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-paper: var(--paper);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-mic: var(--mic);
+  --color-accent: var(--accent);
+  --color-faded: var(--faded);
+  --color-rule: var(--rule);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-serif: var(--font-instrument-serif);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+/* Scrolling symbol strip at the bottom of the page. The list is rendered twice so -50% loops seamlessly. */
+@keyframes ticker {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.ticker-track {
+  animation: ticker 40s linear infinite;
+}
+
+/* Blinking cursor while the transcript "prints". */
+@keyframes caret {
+  50% {
+    opacity: 0;
+  }
+}
+
+.caret {
+  animation: caret 1s step-end infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ticker-track,
+  .caret {
+    animation: none;
+  }
 }
