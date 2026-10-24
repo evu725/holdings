@@ -7,6 +7,7 @@ import type { MatchResponse } from "@/lib/types";
 
 type Recognition = {
   lang: string; continuous: boolean; interimResults: boolean;
+  onstart: (() => void) | null;
   onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
   onerror: ((event: { error: string }) => void) | null;
   onend: (() => void) | null;
@@ -52,7 +53,7 @@ export default function useDiscovery() {
     return () => {
       active = false;
       const current = recognition.current;
-      if (current) { current.onresult = null; current.onerror = null; current.onend = null; current.abort(); }
+      if (current) { current.onstart = null; current.onresult = null; current.onerror = null; current.onend = null; current.abort(); }
       request.current?.abort();
       if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
     };
@@ -72,28 +73,46 @@ export default function useDiscovery() {
     try { saveReviewedBrands(sessionStorage, brands); } catch { /* Current-page discovery still works. */ }
   }
   function startListening() {
+    if (recognition.current) return;
     const browser = window as SpeechWindow;
     const SpeechRecognition = browser.SpeechRecognition || browser.webkitSpeechRecognition;
     if (!SpeechRecognition) { setNotice("Voice input is unavailable here. You can type below, or try Chrome or Edge."); return; }
     clearAudio(); setNotice(""); setResult(null);
     const session = new SpeechRecognition();
     recognition.current = session;
-    session.lang = "en-US"; session.continuous = false; session.interimResults = false;
+    session.lang = "en-US"; session.continuous = false; session.interimResults = true;
     const original = text.trim();
+    let heardWords = false;
+    let failed = false;
+    session.onstart = () => { setListening(true); setNotice("Microphone ready. Speak your brands now."); };
     session.onresult = event => {
       const words = Array.from(event.results).map(item => item[0]?.transcript ?? "").join(" ");
+      if (!words.trim()) return;
+      heardWords = true;
+      setNotice("");
       setText([original, words].filter(Boolean).join(" ").slice(0, 2000));
     };
     session.onerror = event => {
-      setListening(false);
-      setNotice(event.error === "not-allowed" || event.error === "service-not-allowed"
-        ? "Microphone access was not allowed. You can type your brands instead."
-        : event.error === "no-speech" ? "No speech was detected. Try again or type below."
-        : "Voice recognition stopped. Try again or type your brands below.");
+      failed = true;
+      const errors: Record<string, string> = {
+        "not-allowed": "Chrome could not access the microphone. Open the site controls beside the address bar, allow Microphone for localhost, then check Windows microphone permissions.",
+        "service-not-allowed": "Chrome's speech recognition service is unavailable or blocked. Try a regular Chrome window; you can also type your brands.",
+        "audio-capture": "Chrome could not capture microphone audio. Check the selected microphone in Chrome settings and Windows Sound settings, then try again.",
+        "network": "Chrome could not reach its speech recognition service. Check your connection or VPN, then try again. Typed discovery still works.",
+        "no-speech": "No speech was detected. Wait for Microphone ready, speak near your selected microphone, then pause.",
+        "language-not-supported": "The speech service could not recognize English (US). Try typing your brands instead.",
+        "aborted": "Listening was interrupted. Press the microphone to try again.",
+      };
+      setNotice(errors[event.error] ?? "Voice recognition stopped. Try again or type your brands below.");
     };
-    session.onend = () => { setListening(false); if (recognition.current === session) recognition.current = null; };
-    try { session.start(); setListening(true); }
-    catch { recognition.current = null; setNotice("Could not start voice input. You can type below."); }
+    session.onend = () => {
+      if (recognition.current !== session) return;
+      setListening(false); recognition.current = null;
+      if (!failed && !heardWords) setNotice("Listening ended without a transcript. Check that the correct microphone is selected in Chrome, then try again.");
+      else if (!failed) setNotice("Review what was heard, then press Enter to discover companies.");
+    };
+    try { setNotice("Starting microphone…"); session.start(); }
+    catch { recognition.current = null; setListening(false); setNotice("Could not start voice input. Check Chrome's microphone permission and try again."); }
   }
   async function findCompanies(override?: string) {
     const input = discoveryText(override ?? text, emailBrands);

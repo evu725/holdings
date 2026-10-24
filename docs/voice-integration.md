@@ -20,7 +20,7 @@ asset cards, unavailable list and clock are preserved.
 - `GET /api/catalog` supplies actual symbols for the decorative ticker.
 - **Create spoken summary** calls the existing `POST /api/speak` and displays an
   audio player. Missing provider configuration or failures leave results visible.
-- Gmail is optional and lives on `/personalize`, linked from the homepage. The homepage never mounts the Gmail controls. Visiting the separate page checks connection status; scans
+- Gmail is optional and lives on `/personalize`, opened from the floating Gmail button and its introduction dialog. The homepage never mounts the Gmail controls. Visiting the separate page checks connection status; scans
   run only on request. Users review brands and add selected names to discovery,
   then run a new match. Removing brands, rescanning or disconnecting removes
   previously applied email brands from the discovery input.
@@ -82,3 +82,7 @@ Check View details for actual asset IDs, speech generation with and without
 ElevenLabs configuration, and optional Gmail review. A real microphone test needs
 user permission in a supported browser. The prior homepage mock data must not be
 used as evidence of actual instrument availability.
+
+The catalog endpoint also returns source ("live" or "fallback") and refreshSeconds. The homepage checks it every 60 seconds and labels a saved fallback explicitly. This describes live asset availability, not streaming price quotes.
+
+Saved discoveries: results can be saved to localStorage on this device without an account. The /saved page shows up to 20 timestamped company snapshots and supports removal. Raw transcripts, email bodies, tokens and trading credentials are not stored by this feature. Clearing browser data removes saved discoveries. Availability must be checked against the current catalog.
