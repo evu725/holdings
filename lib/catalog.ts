@@ -1,5 +1,5 @@
 import catalogJson from "@/data/runway-assets.json";
-import type { Asset, CatalogResponse, CatalogRow, Chain } from "./types";
+import type { Asset, CatalogResponse, Chain } from "./types";
 
 
 const LIVE_CATALOG_URL = "https://api.truemarkets.co/v1/gateway/assets?asset_class=stock";
@@ -9,27 +9,13 @@ function issuerFor(chain: Chain): string {
   return "Exchange-settled";
 }
 
-function toAsset(row: CatalogRow): Asset {
-  return {
-    id: row.id,
-    symbol: row.symbol,
-    name: row.name,
-    chain: row.chain,
-    venue: row.venue,
-    address: row.address,
-    tradeable: row.tradeable,
-    is_active: row.is_active,
-    status: row.status,
-    icon: row.icon,
-    issuer: issuerFor(row.chain),
-  };
-}
+export type CatalogSnapshot = { assets: Asset[]; source: "live" | "fallback" };
 
-let cached: Asset[] | null = null;
-export async function getCatalog(): Promise<Asset[]> {
+export async function getCatalogSnapshot(): Promise<CatalogSnapshot> {
   try {
     const response = await fetch(LIVE_CATALOG_URL, {
       next: { revalidate: 60 },
+      signal: AbortSignal.timeout(8000),
     });
 
     if (!response.ok) {
@@ -44,7 +30,7 @@ export async function getCatalog(): Promise<Asset[]> {
       throw new Error("Invalid catalog response");
     }
 
-    return result.data
+    const assets: Asset[] = result.data
       .filter(
         (row: {
           asset_class: string;
@@ -59,23 +45,19 @@ export async function getCatalog(): Promise<Asset[]> {
       )
       .map((row: Asset) => ({
         ...row,
-        issuer:
-          row.chain === "robinhood"
-            ? "Robinhood Chain"
-            : row.chain === "base"
-              ? "Coinbase on Base"
-              : "Exchange-settled",
+        issuer: issuerFor(row.chain),
       }))
       .sort((a: Asset, b: Asset) =>
         a.symbol.localeCompare(b.symbol),
       );
+    return { assets, source: "live" };
   } catch (error) {
     console.error("Live catalog failed:", error);
 
     // Temporary fallback: use the existing static catalog.
     const { data } = catalogJson as CatalogResponse;
 
-    return data
+    const assets = data
       .filter(
         (row) =>
           row.is_active &&
@@ -84,13 +66,13 @@ export async function getCatalog(): Promise<Asset[]> {
       )
       .map((row) => ({
         ...row,
-        issuer:
-          row.chain === "robinhood"
-            ? "Robinhood Chain"
-            : row.chain === "base"
-              ? "Coinbase on Base"
-              : "Exchange-settled",
+        issuer: issuerFor(row.chain),
       }))
       .sort((a, b) => a.symbol.localeCompare(b.symbol));
+    return { assets, source: "fallback" };
   }
+}
+
+export async function getCatalog(): Promise<Asset[]> {
+  return (await getCatalogSnapshot()).assets;
 }

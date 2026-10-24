@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import SaveDiscoveryButton from "./SaveDiscoveryButton";
+import GmailFloatingButton from "./GmailFloatingButton";
 import AssetCard from "./AssetCard";
 import LiveClock from "./LiveClock";
 import MicButton from "./MicButton";
@@ -22,6 +24,7 @@ export default function SayItFlow() {
   const { text: transcript, result: apiResult, emailBrands, busy, listening, speechSupported, notice, audioUrl, draftRestored, attachAudio, changeText, changeEmailBrands, startListening: beginListening, stopListening: endListening, findCompanies, createSpeech, saveDraft, reset } = useDiscovery();
   const [reviewing, setReviewing] = useState(false);
   const [symbols, setSymbols] = useState<string[]>([]);
+  const [catalogSource, setCatalogSource] = useState<"live" | "fallback" | "unavailable" | null>(null);
   const typed = transcript;
   const setTyped = changeText;
   const result = apiResult ? toFrontendMatch(apiResult) : null;
@@ -29,12 +32,16 @@ export default function SayItFlow() {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch("/api/catalog", { signal: controller.signal }).then(response => {
+    function refresh() { return fetch("/api/catalog", { signal: controller.signal, cache: "no-store" }).then(response => {
       if (!response.ok) throw new Error("Catalog unavailable");
       return response.json();
-    }).then(data => setSymbols(data.assets.map((asset: { symbol: string }) => asset.symbol)))
-      .catch(() => { /* Discovery still works if the decorative ticker cannot load. */ });
-    return () => controller.abort();
+    }).then(data => {
+      setSymbols(data.assets.map((asset: { symbol: string }) => asset.symbol));
+      setCatalogSource(data.source === "live" ? "live" : "fallback");
+    }).catch(() => { if (!controller.signal.aborted) setCatalogSource("unavailable"); }); }
+    void refresh();
+    const timer = setInterval(() => { void refresh(); }, 60_000);
+    return () => { controller.abort(); clearInterval(timer); };
   }, []);
 
   function startListening() { setReviewing(true); beginListening(); }
@@ -153,7 +160,10 @@ export default function SayItFlow() {
         )}
 
         {phase === "review" && (
-          <div className="mt-10 w-full max-w-xl text-left">
+          <form className="mt-10 w-full max-w-xl text-left" onSubmit={event => {
+            event.preventDefault();
+            findStocks(transcript);
+          }}>
             <label
               htmlFor="transcript"
               className="font-mono text-xs uppercase tracking-[0.2em] text-faded"
@@ -165,13 +175,19 @@ export default function SayItFlow() {
               value={transcript}
               maxLength={2000}
               onChange={(e) => changeText(e.target.value)}
+              onKeyDown={event => {
+                if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                  event.preventDefault();
+                  if (discoveryText(transcript, emailBrands)) event.currentTarget.form?.requestSubmit();
+                }
+              }}
               rows={3}
               className="mt-2 w-full resize-none rounded-sm border border-rule bg-card p-4 font-mono text-base focus:border-ink focus:outline-none"
             />
+            <p className="mt-2 font-mono text-xs text-faded">Enter to discover · Shift+Enter for a new line</p>
             <div className="mt-4 flex flex-wrap gap-3">
               <button
-                type="button"
-                onClick={() => findStocks(transcript)}
+                type="submit"
                 disabled={!discoveryText(transcript, emailBrands)}
                 className="rounded-sm bg-ink px-5 py-3 font-mono text-sm text-paper hover:bg-ink/85 disabled:opacity-40"
               >
@@ -185,7 +201,7 @@ export default function SayItFlow() {
                 Say it again
               </button>
             </div>
-          </div>
+          </form>
         )}
 
         {phase === "loading" && (
@@ -217,6 +233,7 @@ export default function SayItFlow() {
             </p>
 
             <p className="mt-3 font-mono text-xs text-faded">{apiResult?.source === "grok" ? "Explanations generated with Grok." : "Matched using the curated brand catalog."}</p>
+            {!!result.available.length && <SaveDiscoveryButton key={result.available.map(asset => asset.symbol).join(",")} companies={result.available} />}
             <button type="button" disabled={busy} onClick={createSpeech} className="mt-4 rounded-sm border border-ink/30 px-5 py-3 font-mono text-sm disabled:opacity-40">{busy ? "Creating audio…" : "Create spoken summary"}</button>
             {audioUrl && <audio ref={attachAudio} controls src={audioUrl} className="mt-4 w-full" aria-label="Spoken discovery summary" />}
 
@@ -247,11 +264,13 @@ export default function SayItFlow() {
       </main>
 
       <footer className="mx-auto mb-6 w-full max-w-3xl space-y-3 px-[clamp(1rem,4vw,3rem)] text-center font-mono text-xs text-faded">
+        <Link href="/saved" className="inline-block underline underline-offset-4">Saved discoveries</Link>
         {!!emailBrands.length && <p>{emailBrands.length} reviewed Gmail {emailBrands.length === 1 ? "brand" : "brands"} included. <button type="button" disabled={busy || listening} onClick={() => { changeEmailBrands([]); setReviewing(true); }} className="underline disabled:opacity-40">Clear</button></p>}
-        <Link href="/personalize" onClick={event => { if (busy || listening) { event.preventDefault(); return; } saveDraft(); }} aria-disabled={busy || listening} className="inline-block underline underline-offset-4">Personalize with Gmail · optional</Link>
+        {catalogSource && <p>{catalogSource === "live" ? "● Live True Markets catalog · refreshes every 60s" : catalogSource === "fallback" ? "Saved catalog · live connection unavailable" : "Catalog connection unavailable"}</p>}
         <p>Reviewed input may be sent to Grok. Educational discovery, not investment advice.</p>
       </footer>
       <TickerStrip symbols={symbols} />
+      <GmailFloatingButton disabled={busy || listening} onNavigate={saveDraft} />
     </div>
   );
 }
