@@ -1,4 +1,5 @@
-// Shared contract between the frontend and /api/match. Change it together with the backend.
+// Presentation model for the frontend cards. lib/frontend-adapter.ts converts
+// the actual /api/match wire contract from lib/types.ts into this shape.
 
 export type MatchedAsset = {
   brand: string; // what the user said, e.g. "Roblox"
