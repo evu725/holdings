@@ -15,7 +15,7 @@ export default function AssetCard({ asset }: { asset: MatchedAsset }) {
               {asset.symbol}
             </span>
             {asset.tradeable ? (
-              <span className="rounded-full bg-accent px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest text-card">
+              <span className="rounded-full bg-sage px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest text-sage-ink">
                 Tradeable
               </span>
             ) : (

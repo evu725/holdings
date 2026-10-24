@@ -14,7 +14,7 @@ export default function GmailFloatingButton({ disabled, onNavigate }: { disabled
     </button>
     <dialog ref={dialog} id="gmail-introduction" aria-labelledby="gmail-intro-title"
       onClick={event => { if (event.target === event.currentTarget) dialog.current?.close(); }}
-      className="fixed left-auto right-4 top-1/2 m-0 w-[min(24rem,calc(100vw-2rem))] -translate-y-1/2 rounded-sm border border-rule bg-card p-6 text-ink shadow-xl backdrop:bg-black/40">
+      className="fixed left-auto right-4 top-1/2 m-0 w-[min(24rem,calc(100vw-2rem))] -translate-y-1/2 rounded-sm border border-rule bg-card p-6 text-ink shadow-xl backdrop:bg-ink/40">
       <div className="flex items-center justify-between gap-4">
         <p className="font-mono text-xs uppercase tracking-[0.2em] text-faded">More personal. Still your choice.</p>
         <button type="button" autoFocus aria-label="Close Gmail introduction" onClick={() => dialog.current?.close()} className="px-2 py-1 font-mono text-xl hover:text-faded">×</button>

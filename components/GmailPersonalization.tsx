@@ -59,7 +59,7 @@ export default function GmailPersonalization({ onBrandsChange, onBeforeConnect, 
           <p>Nothing affects discovery until you review and select brands. Approved brand names may be sent to Grok by the existing discovery service. No email text is sent.</p>
           <p className="text-sm text-faded">The connection lasts up to 55 minutes. You can disconnect at any time. Closing this page does not revoke Google permission.</p>
           {!status && <p>Checking connection…</p>}
-          {status && !status.configured && <p role="status" className="rounded-lg bg-amber-50 p-3">Gmail needs setup before connecting. Your developer can follow <code>docs/gmail.md</code> to add the Google app settings.</p>}
+          {status && !status.configured && <p role="status" className="rounded-sm bg-blush p-3">Gmail needs setup before connecting. Your developer can follow <code>docs/gmail.md</code> to add the Google app settings.</p>}
           {status?.configured && !status.connected && <button className={button} disabled={busy || disabled} onClick={() => run(async () => {
             const data = await api<{ authorizationUrl: string }>("/api/gmail/connect", "POST", { returnTo: returnTo ?? (onBrandsChange ? "/discover" : "/personalize") });
             onBeforeConnect?.();
