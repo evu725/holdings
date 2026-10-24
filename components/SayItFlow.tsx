@@ -77,7 +77,7 @@ export default function SayItFlow() {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="page-wash flex min-h-dvh flex-col">
       <header className="flex w-full items-center justify-between gap-4 px-[clamp(1rem,4vw,3rem)] py-[clamp(0.75rem,2.5vh,1.5rem)]">
         <button
           type="button"
@@ -98,7 +98,7 @@ export default function SayItFlow() {
         <h1
           className={`max-w-5xl text-balance font-serif leading-[1.05] transition-all duration-500 ${
             phase === "idle"
-              ? "text-[clamp(1.75rem,min(8.5vw,7.5vh),7rem)]"
+              ? "text-[clamp(1.5rem,min(8.5vw,7.5vh),7rem)]"
               : "text-3xl sm:text-4xl"
           }`}
         >
@@ -107,7 +107,8 @@ export default function SayItFlow() {
         </h1>
 
         {phase !== "results" && (
-          <div className="mt-[3.5vh] flex flex-col items-center gap-[1.5vh]">
+          <div className="mt-[calc(3vh+14px)] flex flex-col items-center gap-[calc(1.25vh+14px)]">
+            {/* The extra 14px above and below leaves room for the mic's outer ring. */}
             <MicButton
               listening={phase === "listening"}
               disabled={phase === "loading"}

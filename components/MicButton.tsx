@@ -12,13 +12,13 @@ export default function MicButton({ listening, disabled, onClick }: MicButtonPro
       disabled={disabled}
       aria-label={listening ? "Stop listening" : "Start talking"}
       aria-pressed={listening}
-      className="relative grid size-[clamp(5.5rem,min(30vw,19vh),12rem)] place-items-center rounded-full bg-mic text-ink transition-transform hover:scale-[1.03] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-4 focus-visible:outline-offset-4 focus-visible:outline-ink"
+      className="relative grid size-[clamp(5rem,min(30vw,17vh),12rem)] place-items-center rounded-full bg-mic text-card shadow-[0_0_0_6px_rgb(242_92_78/0.15),0_0_0_14px_rgb(242_92_78/0.07)] transition-transform hover:scale-[1.03] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-4 focus-visible:outline-offset-4 focus-visible:outline-ink"
     >
       {listening && (
         <span aria-hidden className="absolute inset-0 animate-ping rounded-full bg-mic/30" />
       )}
       {listening ? (
-        <span aria-hidden className="relative size-[32%] rounded-md bg-ink" />
+        <span aria-hidden className="relative size-[32%] rounded-md bg-card" />
       ) : (
         <svg
           aria-hidden
